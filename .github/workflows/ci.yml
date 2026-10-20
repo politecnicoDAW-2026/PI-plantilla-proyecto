@@ -1,0 +1,56 @@
+# Integración continua: en cada pull request y en cada push a main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Lint, tests y build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  base-de-datos:
+    name: Base de datos y e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # Supabase en local, con las migraciones y la semilla de datos de prueba. Se dejan fuera los servicios que la
+      # plantilla no usa; si usáis Storage o Realtime, quitad storage-api o realtime de la lista.
+      - name: Arrancar Supabase en local
+        run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,storage-api,postgres-meta
+
+      - name: Tests de las políticas y las funciones (pgTAP)
+        run: npm run test:db
+
+      - name: Conectar la web al Supabase local
+        run: |
+          npx supabase status -o env \
+            | grep -E '^(API_URL|PUBLISHABLE_KEY)=' \
+            | sed -e 's/^API_URL=/VITE_SUPABASE_URL=/' -e 's/^PUBLISHABLE_KEY=/VITE_SUPABASE_PUBLISHABLE_KEY=/' -e 's/"//g' \
+            >> "$GITHUB_ENV"
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

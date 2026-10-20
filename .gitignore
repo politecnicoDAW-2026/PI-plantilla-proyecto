@@ -1,0 +1,19 @@
+# Dependencias y salidas
+node_modules/
+dist/
+playwright-report/
+test-results/
+
+# Secretos: el .env NUNCA se sube (el que se sube es .env.example, sin valores)
+.env
+.env.*
+!.env.example
+
+# Supabase en local
+supabase/.temp/
+supabase/.branches/
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+*.log
